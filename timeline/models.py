@@ -4,6 +4,7 @@ from django.db import models
 # Create your models here.
 class Customers(models.Model):
     vip = models.BooleanField(default=False)
+    name = models.CharField(max_length=50)
 
 
 class Space(models.Model):
