@@ -25,7 +25,7 @@ class Locations(models.Model):
 class Reservations(models.Model):
     num_drink_menus = models.IntegerField(default=0)
     customer = models.ForeignKey(Customers, on_delete=models.CASCADE)
-    res_datetime = models.DateTimeField('date and of reservation')
+    res_datetime = models.DateTimeField('date of reservation')
     res_duration = models.IntegerField(default=120)
 
 
@@ -58,6 +58,7 @@ class PaymentTypes(models.Model):
 
 
 class Payments(models.Model):
-    payment = models.ForeignKey(PaymentTypes, on_delete=models.CASCADE)
-    customer = models.ForeignKey(Customers, on_delete=models.CASCADE)
     ammount = models.IntegerField()
+    payment = models.ForeignKey(PaymentTypes, on_delete=models.CASCADE)
+    reservation = models.ForeignKey(Reservations, on_delete=models.CASCADE)
+    employee = models.ForeignKey(Employees, on_delete=models.CASCADE)
