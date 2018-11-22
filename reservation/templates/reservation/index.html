@@ -1,0 +1,19 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+
+{% if error_message %}<p><strong>{{ error_message }}</strong></p>{% endif %}
+{% if could_not_complete %}<p> {{ could_not_complete }} </p>{% endif %}
+
+<h4> Hi {{request.user}}. Select your desired reservation from the picker below. </h4>
+
+
+<form action="{% url 'reservation:request'  %}" method="post">
+  {% csrf_token %}
+
+  <input type="datetime-local" name="date" value="reservation">
+  <input type="number" name="num_guests" min="1" max="20">
+  <input type="submit" value="check availability">
+</form>
+
+{% endblock %}
