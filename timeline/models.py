@@ -1,8 +1,10 @@
+import calendar
+
 from django.db import models
 
 
 # Create your models here.
-class Customers(models.Model):
+class Customer(models.Model):
     vip = models.BooleanField(default=False)
     name = models.CharField(max_length=50)
 
@@ -14,51 +16,62 @@ class Space(models.Model):
     space_name = models.CharField(max_length=50)
 
 
-class Locations(models.Model):
+class Location(models.Model):
     '''
     ie. Booth, Table, Standing table
     '''
     loc_type = models.CharField(max_length=50)
+    num_seating = models.IntegerField(default=2)
     space = models.ForeignKey(Space, on_delete=models.CASCADE)
 
 
-class Reservations(models.Model):
-    num_drink_menus = models.IntegerField(default=0)
-    customer = models.ForeignKey(Customers, on_delete=models.CASCADE)
+class Reservation(models.Model):
+    num_menus = models.IntegerField(default=0)
     res_datetime = models.DateTimeField('date of reservation')
     res_duration = models.IntegerField(default=120)
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
 
+    def __str__(self):
+        return (f'{self.customer.name} at '
+                f'{self.res_datetime.strftime("%I:%M %p")}'
+                f' on {calendar.day_name[self.res_datetime.weekday()]}')
+    
 
-class Transactions(models.Model):
+class Transaction(models.Model):
     '''
     The act of reserving a table is recorded in a transaction.
     '''
-    location = models.ForeignKey(Locations, on_delete=models.CASCADE)
-    reservations = models.ForeignKey(Reservations, on_delete=models.CASCADE)
+    location = models.ForeignKey(Location, on_delete=models.CASCADE)
+    reservations = models.ForeignKey(Reservation, on_delete=models.CASCADE)
     
 
-class Roles(models.Model):
+class Role(models.Model):
     '''
     employee roles
     '''
     emp_role = models.CharField(max_length=10)
 
+    def __str__(self):
+        return self.emp_role
 
-class Employees(models.Model):
+class Employee(models.Model):
     emp_name = models.CharField(max_length=50)
     emp_sex = models.CharField(
         max_length=6,
         choices=[('M', 'male'), ('F', 'female')]
     )
-    emp_role = models.ForeignKey(Roles, on_delete=models.CASCADE)
+    emp_role = models.ForeignKey(Role, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.emp_name
 
 
-class PaymentTypes(models.Model):
-    pay_type = models.CharField(max_length=10)
+class PaymentType(models.Model):
+    pay_type = models.CharField(max_length=15)
 
 
-class Payments(models.Model):
+class Payment(models.Model):
     ammount = models.IntegerField()
-    payment = models.ForeignKey(PaymentTypes, on_delete=models.CASCADE)
-    reservation = models.ForeignKey(Reservations, on_delete=models.CASCADE)
-    employee = models.ForeignKey(Employees, on_delete=models.CASCADE)
+    payment = models.ForeignKey(PaymentType, on_delete=models.CASCADE)
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
