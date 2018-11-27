@@ -13,7 +13,8 @@ RES_LEN = 120  # reservation length minutes
 
 classes = {
     name: cls for (name, cls) in timeline.models.__dict__.items()
-    if isinstance(cls, type)}
+    if isinstance(cls, type)
+}
 
 def drop_make_customers(num=25):
     '''
@@ -24,7 +25,9 @@ def drop_make_customers(num=25):
     for _ in range(num):
         c = Customer(
             vip=random.choice([True, False]),
-            name=fake_factory.name()
+            name=fake_factory.name(),
+            phone=fake_factory.phone_number(),
+            app_id=random.randint(1,1e6)
         )
         c.save()
 
@@ -48,13 +51,14 @@ def drop_make_locations(num=40):
 
     possible_spaces = classes['Space'].objects.all()
 
-    for _ in range(40):
+    for _ in range(num):
         loc = Location(
             loc_type=random.choice(['Booth', 'Table', 'Bar']),
             space=random.choice(possible_spaces),
             num_seating=2 * random.randint(1, 3)
         )
         loc.save()
+
 
 def drop_make_roles():
     '''
@@ -152,17 +156,29 @@ def drop_make_transactions():
         )
         t.save()
 
+    # for res in reservations:
+    #     if random.choice([True, False], [8, 2]):
+    #         continue
+    #     t = Transaction
+
 
 #### running from $ python manage.py shell
 #### >>> exec(open('fake_data/fake_data_generator.py').read())
 #### :(
 
-drop_make_spaces()
-drop_make_locations()
-drop_make_roles()
-drop_make_customers()
-drop_make_employees()
-drop_make_reservations()
-drop_make_payment_types()
-drop_make_payments()
-drop_make_transactions()
+def create_data(num_customers=25, num_locs=40, num_emps=10, num_res=40):
+    print('begin')
+    drop_make_spaces()
+    drop_make_locations(num_locs)
+    drop_make_roles()
+    # drop_make_customers(num_customers)
+    drop_make_employees(num_emps)
+    # drop_make_reservations()
+    drop_make_payment_types()
+    drop_make_payments()
+    # drop_make_transactions()
+    print('done')
+
+
+if __name__ == '__main__':
+    create_data()
