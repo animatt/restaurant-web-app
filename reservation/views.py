@@ -1,66 +1,42 @@
+import pprint
+import json
 import datetime
 import sys
 import os
-import pprint
 
+from django.utils import timezone
 from django.shortcuts import render
 from django.template import loader
 from django.http import HttpResponse
 
+import django.db as db
 from django.db import connection
 from timeline.models import Reservation
 
-# Create your views here.
-def index(request):
-    template = loader.get_template('reservation/index.html')
-    return HttpResponse(template.render({}, request))
+SQL_PATH = 'reservation/sql'
 
-def request(request):
-    try:
-        num_seats_requested = int(request.POST['num_guests'])
-        start = datetime.datetime.fromisoformat(request.POST['date'])
-    except (KeyError, ValueError):
-        return render(request, 'reservation/index.html', {
-            'error_message': "You didn't select a choice.",
-        })
-    else:
-        end = start + datetime.timedelta(minutes=90)
+def select_least_needed(num_seats_requested, start, end):
+    '''
+    Get the smallest set of available tables of the same type and location
+    that fullfills the reservation but exceeds in capacity the party size by
+    no more than one seat. If no such arrangement is found, throw an
+    EOFError.
+    '''
+    size_of_table_set = 0
+    sql_fname = 'select_least_needed_from_available.sql'
 
-    sql_path = 'reservation/sql'
-    tables_available_query = open(os.path.join(
-        sql_path, 'check_availability.sql')).read()
-
-    with connection.cursor() as cursor:
-        cursor.execute(tables_available_query, [start, end])
-        (num_seats_available,) = cursor.fetchone()
-
-    if num_seats_available < num_seats_requested:
-        return render(request, 'reservation/index.html', {
-            'could_not_complete': ("Sorry. We do not have space available "
-                                   "at this time for a party of this size. "
-                                   "Please select another reservation.")
-            })
-
-    # num_of_each_size_type_query = open(os.path.join(
-    #     sql_path, 'number_of_each_type.sql')).read()
-
-    # with connection.cursor() as cursor:
-    #     cursor.execute(num_of_each_size_type_query, [start, end])
-    #     num_of_each_size_type = cursor.fetchall()
-    #     print(num_of_each_size_type)
-
-    select_least_needed_query = open(os.path.join(
-        sql_path, 'select_least_needed_from_available.sql')).read()
+    select_least_needed_query = open(os.path.join(SQL_PATH, sql_fname)).read()
 
     with connection.cursor() as cursor:
         cursor.execute(select_least_needed_query, [start, end])
-        current_space = current_loc_type = None
+        current_space = None
+        current_loc_type = None
         result_set = []
 
-        results = cursor.fetchall()
-        pprint.pprint(results)
+        sql_results = cursor.fetchall()
+        # pprint.pprint(sql_results)
 
-        for row in results:
+        for row in sql_results:
             loc_id, space, loc_type, num_seats = row
             if current_space != space or current_loc_type != loc_type:
                 size_of_table_set = 0
@@ -71,14 +47,109 @@ def request(request):
             if size_of_table_set < num_seats_requested:
                 size_of_table_set += num_seats
                 result_set.append(row)
-            elif size_of_table_set <= num_seats_requested + 1:
+            if (num_seats_requested
+                <= size_of_table_set
+                <= num_seats_requested + 1):
                 break
 
         if num_seats_requested <= size_of_table_set <= num_seats_requested + 1:
-            pass
+            return result_set
         else:
             raise EOFError("No suitable table arrangement found anywhere.")
 
-        print(result_set)
-    template = loader.get_template('reservation/request.html')
+
+# Create your views here.
+def index(request):
+    if not request.user.is_authenticated:
+        return render(request, 'registration/logged_out.html', {})
+    template = loader.get_template('reservation/index.html')
     return HttpResponse(template.render({}, request))
+
+
+def request(request):
+    if not request.user.is_authenticated:
+        return render(request, 'registration/logged_out.html', {})
+
+    try:
+        num_seats_requested = int(request.POST['num_guests'])
+        start = datetime.datetime.fromisoformat(
+            request.POST['date'] + ':00+00:00'
+        )
+    except (KeyError, ValueError):
+        return render(request, 'reservation/index.html', {
+            'error_message': "You didn't select a choice.",
+        })
+    else:
+        end = start + datetime.timedelta(minutes=90)
+
+    if start < timezone.now():
+        return render(request, 'reservation/index.html', {
+            'error_message': "Please select future accommodations."
+        })
+    try:
+        seats = select_least_needed(num_seats_requested, start, end)
+    except EOFError as e:
+        print(e)
+        return render(request, 'reservation/index.html', {
+            'could_not_complete': (
+                "Sorry. We don't have tables available at the requested time "
+                "for a party of this size. Please select a different "
+                " reservation. Thank you!")})
+
+    reservation_datetime = json.dumps(start, default=str)
+    request.session['reservation'] = {
+        'seats': seats,
+        'datetime': reservation_datetime,
+        'num_menus': num_seats_requested
+    }
+
+    template = loader.get_template('reservation/request.html')
+    return HttpResponse(template.render({'seats': seats}, request))
+
+def preconfirmation(request):
+    transaction_fragment_path = os.path.join(
+        SQL_PATH,
+        'set_reservation_fragment.sql'
+    )
+    transaction_fragment = open(transaction_fragment_path, 'r').read()
+    reservation = request.session['reservation']
+
+    seats = reservation['seats']
+    res_datetime = reservation['datetime']
+    num_menus = reservation['num_menus']
+
+    for seat in seats:
+        loc_id, *_ = seat
+        transaction_fragment += (
+            f'  INSERT INTO timeline_transaction (location_id, reservation_id)'
+            f' VALUES ({loc_id}, @reservation_id);\n'
+        )
+    transaction_fragment += 'COMMIT;'
+    make_reservation = transaction_fragment
+
+    params = [
+        request.user.id,
+        request.user.get_full_name(),
+        num_menus,
+        res_datetime
+    ]
+
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(make_reservation, params)
+            results = cursor.fetchall()
+        except db.OperationalError as e:
+            print(e)
+        except db.Error as e:
+            print(e)
+        finally:
+            result = cursor.status_message
+
+    return HttpResponse('OK')
+
+def confirmation(request):
+    try:
+        print(request.session['reservation'])
+    except KeyError:
+        print('no reservation key in session')
+    return render(request, 'reservation/confirmation.html', {})
