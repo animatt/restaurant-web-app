@@ -11,6 +11,6 @@ SELECT L.id, space_name, loc_type, num_seating
       timeline_reservation R
       	  ON T.reservations_id = R.id
  WHERE R.res_datetime NOT BETWEEN %s AND %s
+    OR R.res_datetime IS NULL
  GROUP BY L.id
  ORDER BY space_name, loc_type, num_seating DESC;
-
