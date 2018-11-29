@@ -5,7 +5,9 @@
 {% if error_message %}<p><strong>{{ error_message }}</strong></p>{% endif %}
 {% if could_not_complete %}<p> {{ could_not_complete }} </p>{% endif %}
 
-<h4> Hi {{request.user}}. Select your desired reservation from the picker below. </h4>
+<h4>
+  Hi {{request.user.get_full_name}}. Please select your desired reservation.
+</h4>
 
 
 <form action="{% url 'reservation:request'  %}" method="post">

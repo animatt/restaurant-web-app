@@ -1,0 +1,10 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+
+<p>
+  Your seats at the {{request.session.reservation.seats.0.1}}
+  have been reserved for {{request.session.reservation.datetime}}.
+</p>
+
+{% endblock %}

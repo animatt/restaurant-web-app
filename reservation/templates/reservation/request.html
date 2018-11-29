@@ -1,1 +1,21 @@
-<!-- comment -->
+{% extends "base_generic.html" %}
+
+{% block content %}
+
+<p>
+  We can seat you in the {{ seats.0.1 }}. Would you like us to reserve these seats?
+</p>
+
+<form action="{% url 'reservation:preconfirmation' %}" method="post">
+  {% csrf_token %}
+
+  <input type="submit" value="Confirm" />
+</form>
+
+<form action="{% url 'reservation:request' %}" method="post">
+  {% csrf_token %}
+
+  <input type="submit" value="Go back" />
+</form>
+
+{% endblock %}
