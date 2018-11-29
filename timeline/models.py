@@ -7,6 +7,8 @@ from django.db import models
 class Customer(models.Model):
     vip = models.BooleanField(default=False)
     name = models.CharField(max_length=50)
+    phone = models.CharField(max_length=20)
+    app_id = models.IntegerField(unique=True)
 
 
 class Space(models.Model):
@@ -29,12 +31,14 @@ class Reservation(models.Model):
     num_menus = models.IntegerField(default=0)
     res_datetime = models.DateTimeField('date of reservation')
     res_duration = models.IntegerField(default=120)
+    confirmed = models.BooleanField(default=False)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
 
     def __str__(self):
-        return (f'{self.customer.name} at '
-                f'{self.res_datetime.strftime("%I:%M %p")}'
-                f' on {calendar.day_name[self.res_datetime.weekday()]}')
+        return (
+            f'{self.customer.name} at {self.res_datetime.strftime("%I:%M %p")}'
+            f' on {calendar.day_name[self.res_datetime.weekday()]}'
+        )
     
 
 class Transaction(models.Model):
@@ -42,7 +46,7 @@ class Transaction(models.Model):
     The act of reserving a table is recorded in a transaction.
     '''
     location = models.ForeignKey(Location, on_delete=models.CASCADE)
-    reservations = models.ForeignKey(Reservation, on_delete=models.CASCADE)
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE)
     
 
 class Role(models.Model):
