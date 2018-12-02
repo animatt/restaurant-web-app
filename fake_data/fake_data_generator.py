@@ -16,6 +16,8 @@ classes = {
     if isinstance(cls, type)
 }
 
+random.seed(10)
+
 def drop_make_customers(num=25):
     '''
     truncate customers, then repopulate it.
