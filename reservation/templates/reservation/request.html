@@ -6,6 +6,8 @@
   We can seat you in the {{ seats.0.1 }}. Would you like us to reserve these seats?
 </p>
 
+<p> We we be holding these seats for {timer} </p>
+
 <form action="{% url 'reservation:preconfirmation' %}" method="post">
   {% csrf_token %}
 
