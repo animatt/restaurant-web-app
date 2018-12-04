@@ -29,8 +29,9 @@ class Location(models.Model):
 
 class Reservation(models.Model):
     num_menus = models.IntegerField(default=0)
-    res_datetime = models.DateTimeField('date of reservation')
+    res_datetime = models.DateTimeField('Date and time of reservation')
     res_duration = models.IntegerField(default=120)
+    res_requested = models.DateTimeField('Date and time of request')
     confirmed = models.BooleanField(default=False)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
 
