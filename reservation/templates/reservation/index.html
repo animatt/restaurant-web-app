@@ -9,7 +9,6 @@
   Hi {{request.user.get_full_name}}. Please select your desired reservation.
 </h4>
 
-
 <form action="{% url 'reservation:request'  %}" method="post">
   {% csrf_token %}
 
