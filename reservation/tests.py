@@ -18,6 +18,7 @@ from .views import (
     select_least_needed,
 )
 
+
 def create_loc_factory(loc_type=None, num_seating=None, space=None):
     def create_loc(
             loc_type=loc_type,
@@ -35,6 +36,7 @@ def create_loc_factory(loc_type=None, num_seating=None, space=None):
 def signin_user(test_obj, username='typical_user'):
     user = User.objects.create(username=username, password='open')
     test_obj.client.force_login(user, backend=None)
+    return user
 
 # Create your tests here.
 class ReservationModelTests(TransactionTestCase):
@@ -74,7 +76,7 @@ class ReservationModelTests(TransactionTestCase):
         res_datetime = timezone.now() + datetime.timedelta(days=1)
         start = str(res_datetime).split('+')[0]
 
-        res_id = hold_seats_for_confirmation(self.request, [seat], start)
+        res_id = hold_seats_for_confirmation(self.request, 1, start, [seat])
         reservations = Reservation.objects.all()
 
         self.assertIsNotNone(res_id)
@@ -85,7 +87,7 @@ class ReservationModelTests(TransactionTestCase):
         '''
         If two database connections request a reservation on an intersecting
         set of locations, the leading request should succeed, and the lagging
-        request should receive an `IntegrityError`. This function ensures that
+        request should receive a `ConcurrencyError`. This function ensures that
         the lagging request will fail with the above exception by simulating
         the effects of a race condition. It does not rely on actual
         concurrency and therefore performs no test of the database locks.
@@ -123,9 +125,9 @@ class ReservationModelTests(TransactionTestCase):
         start = str(res_datetime).split('+')[0]
 
         with self.assertRaises(IntegrityError) as context:
-            res_id = hold_seats_for_confirmation(self.request, seats, start)
+            res_id = hold_seats_for_confirmation(self.request, 2, start, seats)
         
-        self.assertTrue('Seats no longer available.' in str(context.exception))
+        self.assertTrue('Tables no longer available.' in str(context.exception))
 
     def test_select_least_needed_not_enough_tables(self):
         '''
@@ -197,9 +199,10 @@ class ReservationModelTests(TransactionTestCase):
                 num_seats_requested,
                 start
             )
-            reservation_id = Reservation.objects.all().first()
-            self.assertIsNotNone(reservation_id)
-            self.assertEqual(res_id, reservation_id.id)
+            reservation = Reservation.objects.all().first()
+            self.assertIsNotNone(reservation)
+            self.assertEqual(res_id, reservation.id)
+            self.assertEqual(num_seats_requested, reservation.num_menus)
 
             Reservation.objects.get(pk=res_id).delete()
 
@@ -263,9 +266,54 @@ class ReservationModelTests(TransactionTestCase):
         self.assertEqual(tables[0][ID], table_6_seater.id)
         self.assertEqual(tables[1][ID], table_2_seater_1.id)
         self.assertEqual(tables[2][ID], table_2_seater_2.id)
+        
+class ReservationUpdateReservationViewTests(TestCase):
+    def test_update_reservation_no_change(self):
+        '''
+        If the customer requests reservations, but doesn't pick new values,
+        don't alter their reservations.
+        '''
+        signin_user(self)
+        table = Location.objects.create(
+            loc_type='Standing',
+            num_seating=4,
+            space='Patio'
+        )
+
+        ID = str(table.id)
+        RES_DATETIME = timezone.now() + datetime.timedelta(days=1)
+        NUM_MENUS = str(1)
+        
+
+        select_least_needed(
+        
+
+        class request:
+            POST = {
+                ID: 'on',
+                f'new-datetime{ID}': RES_DATETIME,
+                f'new-num-menus{ID}': NUM_MENUS
+            }
 
         
+
 class ReservationIndexViewTests(TestCase):
+    def assemble_session(self, dictionary):
+        '''
+        Update session variables for use in test templates. Adapted from
+        https://groups.google.com/forum/#!topic/django-users/Unji8rnm2hM
+        '''
+        import importlib
+        from django.conf import settings
+        engine = importlib.import_module(settings.SESSION_ENGINE)
+        store = engine.SessionStore()
+        store.save()  # we need to make load() work, or the cookie is worthless
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = store.session_key
+        session = self.client.session
+        session.update(dictionary)
+        session.save()
+        # and now remember to re-login!
+
     def test_select_past_reservation(self):
         '''
         Trying to make a reservation in the past results in an appropriate
@@ -283,8 +331,8 @@ class ReservationIndexViewTests(TestCase):
 
     def test_select_reservation_no_open_tables(self):
         '''
-        Trying to make a reservation when no tables are available return you to
-        the results page and displays an appropriate message.
+        Trying to make a reservation when no tables are available returns you 
+        to the results page and displays an appropriate message.
         '''
         signin_user(self)
         response = self.client.post(reverse('reservation:request'), {
@@ -314,3 +362,35 @@ class ReservationIndexViewTests(TestCase):
         self.assertContains(
             response, escape('Would you like us to reserve these seats?')
         )
+
+    def test_confirm_reservation(self):
+        '''
+        Confirming reservations should result in an appropriate message being
+        displayed.
+        '''
+        res_datetime_raw = timezone.now() + datetime.timedelta(days=1)
+        res_datetime = str(res_datetime_raw).split('+')[0]
+
+        table_id = None
+        table_space = 'Patio'
+        table_type = None
+        num_seats = None
+        
+        reservation = {
+            'seats': [(table_id, table_space, table_type, num_seats)],
+            'datetime': res_datetime
+        }
+
+        self.assemble_session({'reservation': reservation})
+        signin_user(self)
+
+        response = self.client.get(reverse('reservation:confirmation'), {})
+        expected_msg = 'Your seats at the {} have been reserved for {}.'
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, escape(expected_msg.format(table_space, res_datetime))
+        )
+
+class ReservationReservationsViewTests(TestCase):
+    pass
