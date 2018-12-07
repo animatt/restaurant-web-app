@@ -3,6 +3,11 @@
 \#*#
 .\#*
 
+# scratch and help files
+active*
+dumps.sql
+notes.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
