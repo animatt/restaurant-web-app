@@ -33,9 +33,12 @@ def create_loc_factory(loc_type=None, num_seating=None, space=None):
         return table
     return create_loc
 
-def signin_user(test_obj, username='typical_user'):
-    user = User.objects.create(username=username, password='open')
+def signin_user(test_obj):
+    user = User.objects.create(username="Testy", password='testypasswd')
     test_obj.client.force_login(user, backend=None)
+    user.first_name = "Testy"
+    user.last_name = "Smith"
+    user.save()
     return user
 
 # Create your tests here.
@@ -285,7 +288,7 @@ class ReservationUpdateReservationViewTests(TestCase):
         NUM_MENUS = str(1)
         
 
-        select_least_needed(
+        # select_least_needed()
         
 
         class request:
