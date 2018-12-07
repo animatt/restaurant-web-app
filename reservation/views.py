@@ -3,31 +3,35 @@ import json
 import datetime
 import sys
 import os
+import re
 
 from django.utils import timezone
 from django.shortcuts import render
 from django.template import loader
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
+from django.urls import reverse
 
 import django.db as db
 from django.db import IntegrityError
 from django.db import transaction, connection
+from django.db.utils import DatabaseError
 from timeline.models import Reservation
 
-from reservation.test_utils import TEST_SIM_RACE_CONDITION
+from reservation.test_utils import ConcurrencyError, TEST_SIM_RACE_CONDITION
 
 SQL_PATH = 'reservation/sql'
 
 
-def hold_seats_for_confirmation(request, seats, start):
+def hold_seats_for_confirmation(request, num_seats_requested, start, tables):
     '''
-    request: normal request object
-    seats: list of seats (`id`, `space_type`, `loc_type`, `num_seating`)
-    start: datetime lacking timezone postfix
+    request: normal request object (cls)
+    num_seats_requested: party size (int)
+    start: datetime lacking timezone postfix (str)
+    tables: list of tables (`id`, `space_type`, `loc_type`, `num_seating`)
 
     returns >> reservation_id
 
-    Attempt to create a reservation for the seats in `seats`. If any of these
+    Attempt to create a reservation for the tables in `tables`. If any of these
     seats cannot be reserved, throw `IntegrityError` and cancel the
     reservation.
     '''
@@ -40,10 +44,10 @@ def hold_seats_for_confirmation(request, seats, start):
     transaction_tail = transaction_fragment[2:]
 
     res_datetime = str(start)
-    num_menus = len(seats)
+    num_menus = num_seats_requested
 
-    for seat in seats:
-        loc_id, *_ = seat
+    for table in tables:
+        loc_id, *_ = table
         transaction_tail.append(
             f'INSERT INTO timeline_transaction (location_id, reservation_id)'
             f' VALUES ({loc_id}, @reservation_id);'
@@ -57,15 +61,15 @@ def hold_seats_for_confirmation(request, seats, start):
     ]
 
     with connection.cursor() as cursor:
-        set_vars, lock_seats = transaction_head
+        set_vars, lock_tables = transaction_head
         cursor.execute(set_vars, params)
-        cursor.execute(lock_seats.format(', '.join([str(s[0]) for s in seats])))
-        seats_from_query = cursor.fetchall()
+        cursor.execute(lock_tables.format(', '.join([str(s[0]) for s in tables])))
+        tables_from_query = cursor.fetchall()
 
-        if len(seats_from_query) < num_menus:
-            class ConcurrencyError(IntegrityError):
-                tables_already_reserved = set(seats) - set(seats_from_query)
-            raise ConcurrencyError('Seats no longer available.')
+        if len(tables_from_query) < len(tables):
+            e = ConcurrencyError('Tables no longer available.')
+            e.tables_already_reserved = set(tables) - set(tables_from_query)
+            raise e
         for query in transaction_tail:
             cursor.execute(query)
 
@@ -75,16 +79,16 @@ def hold_seats_for_confirmation(request, seats, start):
 
 def select_least_needed(request, num_seats_requested, start):
     '''
-    request: normal request object
-    num_seats_requested: party size
-    start: reservation datetime
+    request: normal request object (cls)
+    num_seats_requested: party size (int)
+    start: reservation datetime (datetime)
 
     returns >> seats (tuple), res_id (int)
 
     Get the smallest set of available tables of the same type and location
     that fullfills the reservation but exceeds in capacity the party size by
-    no more than one seat. If the reservation can't be fulfilled, throw an
-    EOFError.
+    no more than one seat. Create the reservation if it can be fulfilled,
+    otherwise, throw an EOFError.
     '''
     size_of_table_set = 0
     tables_remaining_after_race = None
@@ -134,15 +138,15 @@ def select_least_needed(request, num_seats_requested, start):
                     TEST_SIM_RACE_CONDITION()
                 except:
                     pass
-
                 try:
                     with transaction.atomic():
                         res_id = hold_seats_for_confirmation(
                             request,
+                            num_seats_requested,
+                            start,
                             result_set,
-                            start
                         )
-                except IntegrityError as e:
+                except ConcurrencyError as e:
                     tables_not_available_after_race = e.tables_already_reserved
 
                     res = (str(r[0]) for r in tables_not_available_after_race)
@@ -209,12 +213,120 @@ def request(request):
 
 
 def preconfirmation(request):
-    
-    return HttpResponse('OK')
+    if not request.user.is_authenticated:
+        return render(request, 'registration/logged_out.html', {})
+
+    res_id = request.session['reservation']['res_id']
+    with connection.cursor() as cursor:
+        try:
+            cursor.execute(
+                'UPDATE timeline_reservation SET confirmed = 1 '
+                f'WHERE id = {res_id}'
+            )
+        except DatabaseError as e:
+            print(e)
+
+    return HttpResponseRedirect(reverse('reservation:confirmation'))
 
 def confirmation(request):
+    if not request.user.is_authenticated:
+        return render(request, 'registration/logged_out.html', {})
+
     try:
         print(request.session['reservation'])
     except KeyError:
         print('no reservation key in session')
     return render(request, 'reservation/confirmation.html', {})
+
+def reservations(request):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            'SELECT R.num_menus, R.res_datetime, S.space_name, R.id FROM '
+            'timeline_customer C INNER JOIN '
+            'timeline_reservation R ON C.id = R.customer_id INNER JOIN '
+            'timeline_transaction T ON R.id = T.reservation_id INNER JOIN '
+            'timeline_location L ON T.location_id = L.id INNER JOIN '
+            'timeline_space S ON S.id = L.space_id '
+            f'WHERE C.app_id = {request.user.id} '
+            'GROUP BY R.id, S.space_name'
+        )
+        def func_return_type(func, new_type):
+            def new_func(*args):
+                obj = func(*args)
+                return new_type(obj)
+            return new_func
+
+        global map
+        map = func_return_type(map, list)
+        res = cursor.fetchall()
+        res = [map(str, r) for r in res]
+        for r in res:
+            r[1] = 'T'.join(r[1].split())
+
+    return render(request, 'reservation/reservations.html', {'res': res})
+
+def update_reservation(request):
+    if not request.user.is_authenticated:
+        return render(request, 'registration/logged_out.html', {})
+
+    selections = []
+    for k in request.POST:
+        try:
+            selections.append(int(k))
+        except ValueError:
+            pass
+        else:
+            print(k)
+
+    breakpoint()
+
+    print('selections', selections)
+    for s in selections:
+        try:
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    res = Reservation.objects.get(pk=s)
+                    res.delete()
+
+                    s_new_datetime = datetime.datetime.fromisoformat(
+                        request.POST[f'new-datetime{s}'] + ':00+00:00'
+                    )
+                    s_new_num_menus = request.POST[f'new-num-menus{s}']
+
+                    try:
+                        tables, res_id = select_least_needed(
+                            request,
+                            s_new_num_menus,
+                            s_new_datetime
+                        )
+                    except EOFError:
+                        raise IntegrityError("No suitable accomodations.")
+
+        except IntegrityError as e:
+            return render(request, 'reservation/reservations.html', {
+                'error_message': "Sorry, we're booked."
+            })
+        else:
+            return render(request, 'reservation/reservations.html', {
+                'success_message': "You're good to go."
+            })
+
+    return render(request, 'reservation/reservations.html', {
+        'error_message': "You didn't make a selection!"
+    })
+
+def cancel_reservation(request):
+    if not request.user.is_authenticated:
+        return render(request, 'registration/logged_out.html', {})
+
+    res_ids = []
+    for k in request.POST:
+        try:
+            int(k)
+        except ValueError:
+            pass
+        else:
+            res_ids.append(k)
+
+    Reservation.objects.filter(pk__in=res_ids).delete()
+    return HttpResponseRedirect(reverse('reservation:reservations'))
