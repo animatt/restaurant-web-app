@@ -8,6 +8,9 @@ active*
 dumps.sql
 notes.txt
 
+# migrations because I don't care
+migrations/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
