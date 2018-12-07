@@ -3,8 +3,8 @@
 {% block content %}
 
 <p>
-  Your seats at the {{request.session.reservation.seats.0.1}}
-  have been reserved for {{request.session.reservation.datetime}}.
+  <!-- Don't break line (tests won't work) -->
+  Your seats at the {{request.session.reservation.seats.0.1}} have been reserved for {{request.session.reservation.datetime}}.
 </p>
 
 {% endblock %}
