@@ -12,6 +12,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 
 import django.db as db
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from django.db import transaction, connection
 from django.db.utils import DatabaseError
@@ -79,7 +80,7 @@ def hold_seats_for_confirmation(request, num_seats_requested, start, tables):
 
 def select_least_needed(request, num_seats_requested, start):
     '''
-    request: normal request object (cls)
+    request: request object (must contain user)
     num_seats_requested: party size (int)
     start: reservation datetime (datetime)
 
@@ -238,18 +239,16 @@ def confirmation(request):
         print('no reservation key in session')
     return render(request, 'reservation/confirmation.html', {})
 
-def reservations(request):
+def get_reservations(user_id):
+    '''
+    Return the reservations attached to the user identified by `user_id` in the
+    form of (num_menus, res_datetime, space_name, res_id).
+    '''
     with connection.cursor() as cursor:
-        cursor.execute(
-            'SELECT R.num_menus, R.res_datetime, S.space_name, R.id FROM '
-            'timeline_customer C INNER JOIN '
-            'timeline_reservation R ON C.id = R.customer_id INNER JOIN '
-            'timeline_transaction T ON R.id = T.reservation_id INNER JOIN '
-            'timeline_location L ON T.location_id = L.id INNER JOIN '
-            'timeline_space S ON S.id = L.space_id '
-            f'WHERE C.app_id = {request.user.id} '
-            'GROUP BY R.id, S.space_name'
-        )
+        query_path = os.path.join(SQL_PATH, 'get_reservations.sql')
+        get_reservations_query = open(query_path).read()
+        cursor.execute(get_reservations_query.format(user_id))
+
         def func_return_type(func, new_type):
             def new_func(*args):
                 obj = func(*args)
@@ -261,8 +260,14 @@ def reservations(request):
         res = cursor.fetchall()
         res = [map(str, r) for r in res]
         for r in res:
-            r[1] = 'T'.join(r[1].split())
+            r[1] = re.sub(r'^(.+) (\d\d:\d\d):.+$', r'\1T\2', r[1])
 
+    return res
+
+def reservations(request):
+    if not request.user.is_authenticated:
+        return render(request, 'registration/logged_out.html', {})
+    res = get_reservations(request.user.id)
     return render(request, 'reservation/reservations.html', {'res': res})
 
 def update_reservation(request):
@@ -278,20 +283,23 @@ def update_reservation(request):
         else:
             print(k)
 
-    breakpoint()
-
     print('selections', selections)
     for s in selections:
         try:
             with transaction.atomic():
                 with connection.cursor() as cursor:
-                    res = Reservation.objects.get(pk=s)
-                    res.delete()
+                    try:
+                        res = Reservation.objects.get(pk=s)
+                    except ObjectDoesNotExist:
+                        print('Likely page refresh. `res_id` not found.')
+                        continue
+                    else:
+                        res.delete()
 
                     s_new_datetime = datetime.datetime.fromisoformat(
                         request.POST[f'new-datetime{s}'] + ':00+00:00'
                     )
-                    s_new_num_menus = request.POST[f'new-num-menus{s}']
+                    s_new_num_menus = int(request.POST[f'new-num-menus{s}'])
 
                     try:
                         tables, res_id = select_least_needed(
@@ -304,15 +312,18 @@ def update_reservation(request):
 
         except IntegrityError as e:
             return render(request, 'reservation/reservations.html', {
-                'error_message': "Sorry, we're booked."
+                'error_message': "Sorry, we're booked.",
+                'res': get_reservations(request.user.id)
             })
         else:
             return render(request, 'reservation/reservations.html', {
-                'success_message': "You're good to go."
+                'success_message': "You're good to go.",
+                'res': get_reservations(request.user.id)
             })
 
     return render(request, 'reservation/reservations.html', {
-        'error_message': "You didn't make a selection!"
+        'error_message': "You didn't make a selection!",
+        'res': get_reservations(request.user.id)
     })
 
 def cancel_reservation(request):
