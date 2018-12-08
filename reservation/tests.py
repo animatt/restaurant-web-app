@@ -1,3 +1,4 @@
+import pytz
 import datetime
 import pprint
 
@@ -10,7 +11,7 @@ from django.db import IntegrityError
 
 from unittest import mock
 
-from timeline.models import Location, Space, Reservation
+from timeline.models import Location, Space, Reservation, Customer
 from fake_data import fake_data_generator as fdg
 
 from .views import (
@@ -276,29 +277,106 @@ class ReservationUpdateReservationViewTests(TestCase):
         If the customer requests reservations, but doesn't pick new values,
         don't alter their reservations.
         '''
-        signin_user(self)
+        space = Space.objects.create(space_name='Patio')
         table = Location.objects.create(
             loc_type='Standing',
-            num_seating=4,
-            space='Patio'
+            num_seating=2,
+            space=space
         )
 
-        ID = str(table.id)
-        RES_DATETIME = timezone.now() + datetime.timedelta(days=1)
-        NUM_MENUS = str(1)
-        
+        class request:
+            user = signin_user(self)
 
-        # select_least_needed()
-        
+        RES_DATETIME = timezone.now() + datetime.timedelta(days=1)
+        NUM_MENUS = 1
+        ID = request.user.id
+
+        _, res_id = select_least_needed(request, NUM_MENUS, RES_DATETIME)
+
+        form_res_datetime = ':'.join(
+            str(RES_DATETIME).split('+')[0].split(':')[:-1])
+        form_num_menus = str(NUM_MENUS)
+        form_id = str(res_id)
+
+        POST = {
+            form_id: 'on',
+            f'new-datetime{form_id}': form_res_datetime,
+            f'new-num-menus{form_id}': form_num_menus
+        }
+
+        response = self.client.post(
+            reverse('reservation:update'), POST, follow=True
+        )
+
+        res = Reservation.objects.all().first()
+        cus = Customer.objects.all().first()
+
+        form_res_datetime_dt = datetime.datetime.fromisoformat(
+            form_res_datetime).replace(tzinfo=pytz.UTC)
+
+        self.assertEqual(cus.app_id, ID)
+        self.assertEqual(res.res_datetime, form_res_datetime_dt)
+        self.assertEqual(res.num_menus, NUM_MENUS)
+        self.assertContains(response, escape("You're good to go."))
+
+    def test_update_reservation_arrangements_found(self):
+        '''
+        If the customer requests a new reservation and they can be accomodated,
+        their reservation should be changed and an appropriate message should
+        be displayed.
+        '''
+        space = Space.objects.create(space_name='Patio')
+        make_2_seat_standing_patio = create_loc_factory(
+            loc_type='Standing', num_seating=2, space=space)
+        table1 = make_2_seat_standing_patio()
+        table2 = make_2_seat_standing_patio()
 
         class request:
-            POST = {
-                ID: 'on',
-                f'new-datetime{ID}': RES_DATETIME,
-                f'new-num-menus{ID}': NUM_MENUS
-            }
+            user = signin_user(self)
 
-        
+        RES_DATETIME = timezone.now() + datetime.timedelta(days=1)
+        NUM_MENUS = 1
+        ID = request.user.id
+
+        _, new_res_id = select_least_needed(request, NUM_MENUS, RES_DATETIME)
+
+        NEW_RES_DATETIME = timezone.now() + datetime.timedelta(days=2)
+        NEW_NUM_MENUS = 3
+        NEW_ID = ID  # this is the customer's "app_id" which shouldn't change
+
+        form_res_datetime = ':'.join(
+            str(NEW_RES_DATETIME).split('+')[0].split(':')[:-1])
+        form_num_menus = str(NEW_NUM_MENUS)
+        form_id = str(new_res_id)
+
+        POST = {
+            form_id: 'on',
+            f'new-datetime{form_id}': form_res_datetime,
+            f'new-num-menus{form_id}': form_num_menus
+        }
+
+        response = self.client.post(
+            reverse('reservation:update'), POST, follow=True
+        )
+
+        res = Reservation.objects.all().first()
+        cus = Customer.objects.all().first()
+
+        form_res_datetime_dt = datetime.datetime.fromisoformat(
+            form_res_datetime).replace(tzinfo=pytz.UTC)
+
+        self.assertEqual(cus.app_id, ID)
+        self.assertEqual(res.res_datetime, form_res_datetime_dt)
+        self.assertEqual(res.num_menus, NEW_NUM_MENUS)
+        self.assertContains(response, escape("You're good to go."))
+
+    def test_update_reservation_arrangements_found(self):
+        '''
+        If the customer requests reservations but they cannot be accomodated,
+        their reservations should remain unchanged.
+        '''
+        pass
+
 
 class ReservationIndexViewTests(TestCase):
     def assemble_session(self, dictionary):
