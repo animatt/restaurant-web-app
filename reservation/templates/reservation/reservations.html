@@ -2,56 +2,68 @@
 
 {% block content %}
 
-{% if error_message %}
-<p> {{error_message}} </p>
-{% elif success_message %}
-<p> {{success_message}} </p>
-{% endif %}
-
-<p> Hi {{user.get_full_name}}.
+<h4 class="page-content">
+  Hi {{user.get_full_name}}.
   {% if res %}
   See your reservations below.
   {% else %}
   You haven't made any reservations.
   {% endif %}
-</p>
+</h4>
+
 <form action="{% url 'reservation:update' %}" method="post">
   {% csrf_token %}
-  <table class="reservation-menu">
+  <div class="flex-container">
     {% for r in res %}
     {# r -> (`num_menus`, `res_datetime`, `space_name`, `id`) #}
-    <tr>
-      <td>
-	<input type="checkbox" name="{{r.3}}" hidden />
+    <div class="grid-container">
+      <div>
+	<input class="col-1" type="checkbox" name="{{r.3}}" hidden />
+      </div>
+      <div class="col-2" style="width: 100%">
 	Reservation for {{r.0}} in the {{r.2}} on {{r.1}}
-      </td>
-      <td class="edit" hidden>
-	<input type="datetime-local"
+      </div>
+      <div>
+	<input class="col-3 edit"
+	       type="datetime-local"
 	       name="new-datetime{{r.3}}"
 	       value="{{r.1}}"
+	       hidden
 	/>
-      </td>
-      <td>
-	<input class="edit"
+      </div>
+      <div>
+	<input class="col-4 edit"
 	       type="number"
 	       name="new-num-menus{{r.3}}"
 	       min="1"
 	       max="20"
 	       value="{{r.0}}"
-	       hidden />
-      </td>
-    </tr>
+	       hidden
+	/>
+      </div>
+    </div>
     {% endfor %}
-  </table>
-  <input type="submit" value="Edit" />
-  <input class="edit" type="submit" value="Update" hidden />
-  <input class="edit"
-	 type="submit"
-	 value="Cancel reservation(s)"
-	 formaction="{% url 'reservation:cancel' %}"
-	 hidden
-  />
+    <div class="grid-container">
+      <div></div>
+      <div class="footer">
+	<input type="submit" value="Edit" />
+	<input class="edit" type="submit" value="Update" hidden />
+	<input class="edit"
+	       type="submit"
+	       value="Cancel reservation(s)"
+	       formaction="{% url 'reservation:cancel' %}"
+	       hidden
+	/>
+      </div>
+    </div>
+  </div>
 </form>
+
+{% if error_message %}
+<p class="page-content"> {{error_message}} </p>
+{% elif success_message %}
+<p class="page-content"> {{success_message}} </p>
+{% endif %}
 
 <script>
  $(document).ready(function() {
@@ -63,7 +75,7 @@
 
  function toggle_hidden() {
      const reservations = document.querySelectorAll(
-	 '.reservation-menu input[type="checkbox"]'
+	 'input[type="checkbox"]'
      );
      const edit_fields = document.querySelectorAll('.edit');
 
