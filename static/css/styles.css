@@ -1,5 +1,39 @@
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+.row {
+    display: flex;
+}
+
+.col-sm-2 {
+    padding-top: 40px;
+    flex-basis: 200px;
+}
+
 .sidebar-nav {
     margin-top: 20px;
     padding: 0;
     list-style: none;
+}
+
+.sidebar-nav > * {
+    height: 30px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.flex-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.grid-container {
+    display: grid;
+    grid-template-columns: 30px 410px 210px 37px;
+    grid-template-rows: 30px;
+}
+
+.col-sm-10 > .page-content {
+    padding-left: 30px;
 }
