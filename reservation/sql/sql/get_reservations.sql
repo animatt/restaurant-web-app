@@ -1,0 +1,1 @@
+SELECT R.num_menus, R.res_datetime, S.space_name, R.id FROM timeline_customer C INNER JOIN timeline_reservation R ON C.id = R.customer_id INNER JOIN timeline_transaction T ON R.id = T.reservation_id INNER JOIN timeline_location L ON T.location_id = L.id INNER JOIN timeline_space S ON S.id = L.space_id WHERE C.app_id = {} GROUP BY R.id, S.space_name
