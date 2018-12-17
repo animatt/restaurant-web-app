@@ -65,14 +65,18 @@ def select_least_needed(request, num_seats_requested, start):
 
     section_start = 0
     while True:
-        section_start, tables = _find_smallest_candidate(
+        section_start, result_set = _find_smallest_candidate(
             sql_results,
             num_seats_requested,
             section_start,
             tables_not_available_after_race
         )
 
-        TEST_SIM_RACE_CONDITION()
+        try:
+            TEST_SIM_RACE_CONDITION()
+        except:
+            #### it tries to delete a second time ####
+            pass
 
         try:
             with transaction.atomic():
@@ -88,12 +92,12 @@ def select_least_needed(request, num_seats_requested, start):
             res = (str(r[0]) for r in tables_not_available_after_race)
             print(f"({', '.join(res)}) reserved by another customer")
 
-            pos = section_start - 1
+            # pos = section_start - 1
             size_of_table_set = 0
             result_set = []
         else:
             break
-        pos += 1
+        # pos += 1
 
     return result_set, res_id
 
@@ -208,11 +212,14 @@ def _find_smallest_candidate(
     accomodated.
     '''
     found = False
-    eof = False
+    eof = True if len(tables) == 0 else False
     section_start = pos
     while not found and not eof:
         found, entering_new_section, table_set = _scan(
-            tables, num_seats_requested, pos, []
+            tables,
+            num_seats_requested,
+            pos,
+            tables_not_available_after_race
         )
         pos += 1
         if entering_new_section:
