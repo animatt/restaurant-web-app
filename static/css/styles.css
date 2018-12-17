@@ -30,7 +30,7 @@
 
 .grid-container {
     display: grid;
-    grid-template-columns: 30px 410px 210px 37px;
+    grid-template-columns: 30px 525px 210px 37px;
     grid-template-rows: 30px;
 }
 

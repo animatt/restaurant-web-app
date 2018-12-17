@@ -20,8 +20,13 @@
       <div>
 	<input class="col-1" type="checkbox" name="{{r.3}}" hidden />
       </div>
-      <div class="col-2" style="width: 100%">
-	Reservation for {{r.0}} in the {{r.2}} on {{r.1}}
+      <div class="col-2 res-msg"
+	   style="width: 100%"
+	   data-customer="{{r.0}}"
+	   data-datetime="{{r.1}}"
+	   data-space="{{r.2}}"
+      >
+	<!-- Reservation for {{r.0}} in the {{r.2}} on {{r.1}} -->
       </div>
       <div>
 	<input class="col-3 edit"
@@ -67,25 +72,37 @@
 
 <script>
  $(document).ready(function() {
+
+     $('.res-msg').each(function() {
+	 let customer = this.dataset.customer;
+	 let datetime = this.dataset.datetime;
+	 let space = this.dataset.space;
+
+	 datetime = moment(datetime).format('MMMM Do YYYY, [at] h:mm:ss a');
+	 space = space.replace(/_/, ' ').toLowerCase();
+	 this.textContent = `Reservation for ${customer} in `
+			+ `the ${space} on ${datetime}.`
+     });
+
+     // ################ LISTENERS ################
      $('input[value="Edit"]').click((e) => {
 	 e.preventDefault();
 	 toggle_hidden();
      });
+     // ###########################################
  });
 
  function toggle_hidden() {
-     const reservations = document.querySelectorAll(
+     const reservations = Array.from(document.querySelectorAll(
 	 'input[type="checkbox"]'
-     );
-     const edit_fields = document.querySelectorAll('.edit');
+     ));
+     const pickers = Array.from(document.querySelectorAll('.edit'));
+     const toggle = [...reservations, ...pickers];
 
      if (reservations[0].hasAttribute("hidden")) {
-	 reservations.forEach((node) => { node.removeAttribute("hidden") });
-	 edit_fields.forEach((node) => { node.removeAttribute("hidden") });
-	 
+	 toggle.forEach((node) => { node.removeAttribute("hidden") });
      } else {
-	 reservations.forEach((node) => { node.setAttribute("hidden", "") });
-	 edit_fields.forEach((node) => { node.setAttribute("hidden", "") });
+	 toggle.forEach((node) => { node.setAttribute("hidden", "") });
      }
  }
 </script>
