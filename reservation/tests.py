@@ -14,8 +14,8 @@ from unittest import mock
 from timeline.models import Location, Space, Reservation, Customer
 from fake_data import fake_data_generator as fdg
 
-from .views import (
-    hold_seats_for_confirmation,
+from .sql.utils import (
+    _hold_seats_for_confirmation,
     select_least_needed,
 )
 
@@ -80,7 +80,7 @@ class ReservationModelTests(TransactionTestCase):
         res_datetime = timezone.now() + datetime.timedelta(days=1)
         start = str(res_datetime).split('+')[0]
 
-        res_id = hold_seats_for_confirmation(self.request, 1, start, [seat])
+        res_id = _hold_seats_for_confirmation(self.request, 1, start, [seat])
         reservations = Reservation.objects.all()
 
         self.assertIsNotNone(res_id)
@@ -129,7 +129,7 @@ class ReservationModelTests(TransactionTestCase):
         start = str(res_datetime).split('+')[0]
 
         with self.assertRaises(IntegrityError) as context:
-            res_id = hold_seats_for_confirmation(self.request, 2, start, seats)
+            res_id = _hold_seats_for_confirmation(self.request, 2, start, seats)
         
         self.assertTrue('Tables no longer available.' in str(context.exception))
 
@@ -172,7 +172,7 @@ class ReservationModelTests(TransactionTestCase):
         '''
         _user = User.objects.create_user(
             'Testy',
-            't@test.com'
+            't@test.com',
             'testyboy5'
         )
         _user.first_name = 'Testy'
@@ -209,6 +209,40 @@ class ReservationModelTests(TransactionTestCase):
             self.assertEqual(num_seats_requested, reservation.num_menus)
 
             Reservation.objects.get(pk=res_id).delete()
+
+    def test_select_least_needed_tables_available_special_case(self):
+        _user = User.objects.create_user(
+            'Testy',
+            't@test.com',
+            'testyboy5'
+        )
+        _user.first_name = 'Testy'
+        _user.last_name = 'Smith'
+        _user.save()
+
+        fdg.drop_make_spaces()
+        space = Space.objects.all().first()
+        create_6_seater = create_loc_factory('Standing', 6, space)
+        create_4_seater = create_loc_factory('Standing', 4, space)
+
+        create_6_seater()
+        create_4_seater()
+        create_4_seater()
+
+        class request:
+            user = _user
+        start = timezone.now() + datetime.timedelta(hours=1)
+
+        num_seats_requested = 8
+        tables, res_id = select_least_needed(
+            request,
+            num_seats_requested,
+            start
+        )
+        reservation = Reservation.objects.get(pk=res_id)
+        self.assertIsNotNone(reservation)
+        self.assertEqual(res_id, reservation.id)
+        self.assertEqual(num_seats_requested, reservation.num_menus)
 
     
     def test_select_least_needed_tables_available_concurrency_block(self):
@@ -258,7 +292,7 @@ class ReservationModelTests(TransactionTestCase):
         Reservation.objects.all().delete()
 
         func = Location.objects.get(pk=table_4_seater.id).delete
-        mock_capture = 'reservation.views.TEST_SIM_RACE_CONDITION'
+        mock_capture = 'reservation.sql.utils.TEST_SIM_RACE_CONDITION'
         with mock.patch(mock_capture, side_effect=func):
             tables, res_id = select_least_needed(
                 request,
