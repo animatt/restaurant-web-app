@@ -4,42 +4,34 @@
     {% block title %}<title> Restaurant Reservations </title>{% endblock %}
     <meta charset="utf-8">
     <!-- Add additional CSS in static file -->
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
-    <!-- <script -->
-    <!--   src="https://code.jquery.com/jquery-3.3.1.slim.min.js" -->
-    <!--   integrity="sha256-3edrmyuQ0w65f8gfBsqowzjJe2iM6n0nKciPUp8y+7E=" -->
-    <!--   crossorigin="anonymous"> -->
-    <!-- </script> -->
-    <script src="{% static 'lib/moment.js' %}"></script>
-    <script src="{% static 'lib/jquery-ui-1.12.1.custom/external/jquery/jquery.js' %}"></script>
-    <script src="{% static 'lib/jquery-ui-1.12.1.custom/jquery-ui.js' %}"></script>
+	{% include 'css.html' %}
   </head>
   <body>
     <div class="container-fluid">
       <div class="row">
-	<div class="col-sm-2">
-	  {% block sidebar %}
+		<div class="col-sm-2">
+		  {% block sidebar %}
           <ul class="sidebar-nav">
             <li><a href="{% url 'index' %}">Home</a></li>
             <li><a href="">Restaurants</a></li>
-	    {% if user.is_authenticated %}
+			{% if user.is_authenticated %}
             <li>
-	      <a href="{% url 'reservation:reservations' %}">
-		Reservations
-	      </a>
-	    </li>
-	    {% endif %}
-	    {% if user.is_authenticated %}
-	    <li><a href="{% url 'logout' %}">Log out</a></li>
-	    {% else %}
-	    <li><a href="{% url 'login' %}">Log in</a></li>
-	    {% endif %}
+			  <a href="{% url 'reservation:reservations' %}">
+				Reservations
+			  </a>
+			</li>
+			{% endif %}
+			{% if user.is_authenticated %}
+			<li><a href="{% url 'logout' %}">Log out</a></li>
+			{% else %}
+			<li><a href="{% url 'login' %}">Log in</a></li>
+			{% endif %}
           </ul>
-	  {% endblock %}
-	</div>
-	<div class="col-sm-10">{% block content %}{% endblock %}</div>
+		  {% endblock %}
+		</div>
+		<div class="col-sm-10">{% block content %}{% endblock %}</div>
       </div>
     </div>
+	{% include 'js.html' %}
   </body>
 </html>
