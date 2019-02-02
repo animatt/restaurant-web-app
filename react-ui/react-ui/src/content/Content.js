@@ -1,4 +1,7 @@
 import React, {Component} from 'react';
+import {BrowserRouter, Route, Redirect, Switch} from 'react-router-dom';
+
+import Welcome from './welcome/Welcome';
 
 class Content extends Component {
 	constructor(props) {
@@ -8,12 +11,12 @@ class Content extends Component {
 		return (
 			<div className="col-sm-10">
 			  <main className="Content">
-				<header className="App-header">
-				  <h1>Welcome</h1>
-				</header>
-				<p>
-				  Click here to make a reservation
-				</p>
+				<BrowserRouter>
+				  <switch>
+					<Route exact path='/' component={Welcome} />
+					<Route exact path='/reservation' component={SelectRes} />
+				  </switch>
+				</BrowserRouter>
 			  </main>
 			</div>
 		);
