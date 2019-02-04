@@ -1,6 +1,7 @@
-from django.template import loader
-from django.http import HttpResponse
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.shortcuts import render
 
+
+@ensure_csrf_cookie
 def index(request):
-    template = loader.get_template('home/index.html')
-    return HttpResponse(template.render({}, request))
+    return render(request, 'home/index.html', {})
