@@ -20,7 +20,6 @@ from timeline.models import Reservation
 
 from reservation.sql.utils import get_reservations, select_least_needed
 
-# Create your views here.
 def index(request):
     if not request.user.is_authenticated:
         return render(request, 'registration/logged_out.html', {})
