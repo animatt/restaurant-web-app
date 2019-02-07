@@ -29,7 +29,7 @@ def index(request):
 
 def request(request):
     if not request.user.is_authenticated:
-        return render(request, 'registration/logged_out.html', {})
+        return HttpResponse('Hello World', content_type="text/plain")  # 'render(request, 'registration/logged_out.html', {})
     try:
         num_seats_requested = int(request.POST['num_guests'])
         start = datetime.datetime.fromisoformat(
