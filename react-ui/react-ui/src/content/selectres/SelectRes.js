@@ -11,17 +11,19 @@ class SelectRes extends Component {
 	}
 	requestReservation() {
 		const endpoint = '/reservation/request/';
-		const csrfToken = cookie.load('csrftocken')
-		console.log(`csrfToken = ${csrfToken}`);
+		const csrfToken = cookie.load('csrftoken')
 		const lookupOptions = {
 			method: 'POST',
 			headers: {
 				'X-CSRFToken': csrfToken,
+				'Content-Type': 'text/plain',
 			},
 			body: JSON.stringify([this.state.date, this.state.num_guests]),
 			credentials: 'include',
 		}
-		fetch(endpoint, lookupOptions).then(response => console.log(response));
+		fetch(endpoint, lookupOptions).then(
+			response => console.log(response.text())
+		);
 	}
 	handleChange(event) {
 		const value = {[event.target.name]: event.target.value}
@@ -29,7 +31,6 @@ class SelectRes extends Component {
 		this.setState(value);
 	}
 	handleSubmit(event) {
-		alert(`Pressed submit button.`);
 		this.requestReservation();
 		console.log([this.state.date, this.state.num_guests]);
 		event.preventDefault();
@@ -41,6 +42,7 @@ class SelectRes extends Component {
 			  <p>Please select your desired reservation.</p>
 			  <form onSubmit={this.handleSubmit}>
 				<input onChange={this.handleChange}
+					   defaultValue="2019-12-31T12:59"
 					   type="datetime-local" name="date" />
 				<input onChange={this.handleChange}
 					   type="number" name="num_guests" min="1" max="20" />
