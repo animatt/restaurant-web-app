@@ -6,6 +6,7 @@ class Navbar extends Component {
 		super(props)
 	}
 	render() {
+		const {loggedIn} = this.props
 		if (loggedIn) {
 			const loginButton = <Link to="/login">Log in</Link>;
 		} else {
