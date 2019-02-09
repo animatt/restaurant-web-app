@@ -6,21 +6,20 @@ class Navbar extends Component {
 		super(props)
 	}
 	render() {
-		const {loggedIn} = this.props
+		const {loggedIn, userName} = this.props;
+		let loginButton = <Link to="/login">Log in</Link>;
 		if (loggedIn) {
-			const loginButton = <Link to="/login">Log in</Link>;
-		} else {
-			const loginButton = <Link to="/logout">Log Out</Link>;
+			loginButton = <Link to="/logout">Log out</Link>;
 		}
 		return (
 			<div className="col-sm-2">
 			  <nav className="Navbar">
+				{userName ? <h2>Welcome {userName}</h2> : null}
 				<ul class="sidebar-nav">
 				  <li><Link to="/">Home</Link></li>
 				  <li>Restaurants</li>
 				  <li>Reservations</li>
 				  <li>{loginButton}</li>
-				  <li></li>
 				</ul>
 			  </nav>
 			</div>
