@@ -11,17 +11,25 @@ import Content from './content/Content';
 class App extends Component {
 	constructor(props) {
 		super(props);
-		this.state = {loggedIn: false};
+		this.state = {loggedIn: false, userName: ''};
 	}
 	componentDidMount() {
-		// fetch browser session
-		this.setState({});
+		const endpoint = '/accounts';
+		const lookupOptions = {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json',
+			}
+		}
+		fetch(endpoint, lookupOptions).then(
+			response => this.setState(response.json())
+		);
 	}
 	render() {
 		return (
 			<Router>
 			  <div className="App">
-				<Navbar />
+				<Navbar loggedIn={this.loggedIn} userName={this.username} />
 				<Content />
 			  </div>
 			</Router>
