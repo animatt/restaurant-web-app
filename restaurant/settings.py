@@ -31,7 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'accouts.apps.AccountsConfig',
+    'accounts.apps.AccountsConfig',
     'reservation.apps.ReservationConfig',
     'timeline.apps.TimelineConfig',
     'django.contrib.admin',
