@@ -1,7 +1,6 @@
 import React, { Component } from 'react';
 import {BrowserRouter as Router, Route} from 'react-router-dom';
 import 'whatwg-fetch';
-import cookie from 'react-cookies';
 
 import './App.css';
 
@@ -14,7 +13,7 @@ class App extends Component {
 		this.state = {loggedIn: false, userName: ''};
 	}
 	componentDidMount() {
-		const endpoint = '/accounts';
+		const endpoint = '/accounts/credentials';
 		const lookupOptions = {
 			method: 'GET',
 			headers: {
@@ -25,12 +24,16 @@ class App extends Component {
 			response => this.setState(response.json())
 		);
 	}
+	setLogin(loggedIn, username) {
+		this.setState({loggedIn, username}); 
+	}
 	render() {
 		return (
 			<Router>
 			  <div className="App">
-				<Navbar loggedIn={this.loggedIn} userName={this.username} />
-				<Content />
+				<Navbar loggedIn={this.state.loggedIn}
+						userName={this.state.username} />
+				<Content setLogin={this.setLogin} />
 			  </div>
 			</Router>
 		);

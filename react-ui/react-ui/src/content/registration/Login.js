@@ -13,7 +13,7 @@ class Login extends Component {
 		this.setState({[event.target.name]: event.target.value});
 	}
 	requestAuthentication() {
-		const endpoint = '/accounts/login';
+		const endpoint = '/accounts/credentials';
 		const csrfToken = cookie.load('csrftoken');
 		const lookupOptions = {
 			method: 'POST',
